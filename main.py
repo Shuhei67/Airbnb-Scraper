@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.ERROR)
 
 
-# Récuperait le contenu de la première page à une l'URL donnée,
-# Récupère maintenant 5 pages au lieu d'une seule page en cliquant sur "suivant"
+
+# Récupère 5 pages de résultats de recherche Airbnb et retourne une liste de leur contenu HTML :
 def fetch_content(url: str, from_disk: bool = False) -> list:
 
     if from_disk and FILEPATH.exists():
@@ -25,7 +25,7 @@ def fetch_content(url: str, from_disk: bool = False) -> list:
         print(50 * "-")
         print("🚀 Lancement du scraping, veuillez patienter...")
         logger.debug(f"Récupération du contenu de l'URL : {url}")
-        html_pages = [] # Liste qui stockera html de chaque page (BONUS)
+        html_pages = [] # Liste qui stockera html de chaque page
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
@@ -33,7 +33,7 @@ def fetch_content(url: str, from_disk: bool = False) -> list:
 
             for i in range(5): # On va scraper les 5 premières pages
                 page.wait_for_selector("[data-testid='card-container']")
-                html_pages.append(page.content()) # On ajoute le HTML à la liste
+                html_pages.append(page.content()) # On ajoute le contenu HTML à la liste
                 print(f"Page {i+1} récupérée.")
                 if i < 4:
                     print(f"Récupuration de la page {i + 2} sur 5 en cours ...")
@@ -52,10 +52,10 @@ def fetch_content(url: str, from_disk: bool = False) -> list:
         raise e
  
 
-# Traite le contenu HTML pour extraire le prix moyen
-# Cette fois en prenant en compte les 5 pages de notre liste
-def get_average_price(html_pages: list) -> int:
+# Traite le contenu HTML pour extraire le prix moyen :
+def get_average_price(html_pages: list, max_price: int) -> int:
     prices = []
+    excluded = 0
 
     for html in html_pages:  # On vient boucler sur chaque page
         soup = BeautifulSoup(html, "html.parser")
@@ -67,14 +67,17 @@ def get_average_price(html_pages: list) -> int:
                 continue
             price = re.sub(r"\D", "", price_div.text)
             if price.isdigit():
-                logger.debug(f"Prix trouvé : {price}")
-                prices.append(int(price))
+                if int(price) <= max_price:
+                    prices.append(int(price))
+                else:
+                    excluded += 1
             else:
                 logger.warning(f"Le prix trouvé n'est pas un nombre : {price}")
 
     print(f"Nombre d'annonces analysées : {len(prices)}")
     print(f"Prix le moins cher : {min(prices)}€")
     print(f"Prix le plus cher : {max(prices)}€")
+    print(f"Annonces exclues : {excluded}")
 
     return round(sum(prices) / len(prices)) if prices else 0
 
@@ -99,7 +102,9 @@ def read_from_file() -> str:
 
 if __name__ == "__main__":
     url = sys.argv[-1]
+    print(50 * "-")
+    max_price = int(input("Budget maximum pour le mois : "))
     content = fetch_content(url=url, from_disk=False) # En mettant false il va sur internet
-    average_price = get_average_price(html_pages=content)
+    average_price = get_average_price(html_pages=content, max_price=max_price)
     print(50 * "-")
     print(f"Le prix moyen des annonces est de {average_price}€")
