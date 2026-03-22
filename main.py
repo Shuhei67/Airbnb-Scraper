@@ -1,6 +1,5 @@
 import requests
 from pathlib import Path
-import sys
 import logging
 import re
 from bs4 import BeautifulSoup
@@ -12,7 +11,10 @@ FILEPATH = Path(__file__).parent / "airbnb.html"
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.ERROR)
 
-
+# Construit l'URL de recherche en fonction des paramètres d'entrée :
+def build_url(city: str, checkin: str, checkout: str, adults: int) -> str:
+    city_formatted = city.replace(" ", "--") # "New York" → "New--York"
+    return f"https://www.airbnb.fr/s/{city_formatted}/homes?refinement_paths%5B%5D=%2Fhomes&checkin={checkin}&checkout={checkout}&date_picker_type=calendar&adults={adults}&guests={adults}&search_type=AUTOSUGGEST"
 
 # Récupère 5 pages de résultats de recherche Airbnb et retourne une liste de leur contenu HTML :
 def fetch_content(url: str, from_disk: bool = False) -> list:
@@ -101,9 +103,14 @@ def read_from_file() -> str:
 
 
 if __name__ == "__main__":
-    url = sys.argv[-1]
     print(50 * "-")
-    max_price = int(input("Budget maximum pour le mois : "))
+    city = input("Ville : ")
+    checkin = input("Date d'arrivée (YYYY-MM-DD) : ")
+    checkout = input("Date de départ (YYYY-MM-DD) : ")
+    adults = int(input("Nombre de personnes : "))
+    max_price = int(input("Budget total maximum pour le mois : "))
+
+    url = build_url(city=city, checkin=checkin, checkout=checkout, adults=adults)
     content = fetch_content(url=url, from_disk=False) # En mettant false il va sur internet
     average_price = get_average_price(html_pages=content, max_price=max_price)
     print(50 * "-")
