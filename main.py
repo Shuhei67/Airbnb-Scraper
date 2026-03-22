@@ -54,15 +54,17 @@ def fetch_content(url: str, from_disk: bool = False) -> list:
         raise e
  
 
-# Traite le contenu HTML pour extraire le prix moyen :
-def get_average_price(html_pages: list, max_price: int) -> int:
+# Traite le contenu HTML pour extraire les informations sur les annonces (prix, liens) et affiche les statistiques :
+def analyze_listings(html_pages: list, max_price: int) -> None:
     prices = []
     excluded = 0
+    links = []
 
     for html in html_pages:  # On vient boucler sur chaque page
         soup = BeautifulSoup(html, "html.parser")
         divs = soup.find_all("div", {"data-testid": "card-container"})
         for div in divs:
+            link = div.find("a", href=True)
             price_div = div.find("span", class_="sjwpj0z") or div.find("span", class_="u174bpcy")
             if not price_div:
                 logger.warning(f"Pas réussi à trouver le prix de la div {div}")
@@ -71,17 +73,24 @@ def get_average_price(html_pages: list, max_price: int) -> int:
             if price.isdigit():
                 if int(price) <= max_price:
                     prices.append(int(price))
+                    if link:
+                        links.append((int(price), f"https://www.airbnb.fr{link["href"]}"))
                 else:
                     excluded += 1
-            else:
-                logger.warning(f"Le prix trouvé n'est pas un nombre : {price}")
 
     print(f"Nombre d'annonces analysées : {len(prices)}")
+    print(f"Annonces exclues (hors budget) : {excluded}")
+    if not prices:
+        print("Aucune annonce dans votre budget !")
+        return 0
     print(f"Prix le moins cher : {min(prices)}€")
     print(f"Prix le plus cher : {max(prices)}€")
-    print(f"Annonces exclues : {excluded}")
-
-    return round(sum(prices) / len(prices)) if prices else 0
+    average = round(sum(prices) / len(prices)) if prices else 0
+    print(f"Le prix moyen des annonces est de {average} euros")
+    print(50 * "-")
+    print("Voici dans l'ordre croissant les annonces dans votre budget :")
+    for price, link in sorted(links):  # ← trié du moins cher au plus cher
+        print(f"- {price}€ ---> {link}")
 
 
 # Écrit le contenu dans un fichier :
@@ -112,6 +121,4 @@ if __name__ == "__main__":
 
     url = build_url(city=city, checkin=checkin, checkout=checkout, adults=adults)
     content = fetch_content(url=url, from_disk=False) # En mettant false il va sur internet
-    average_price = get_average_price(html_pages=content, max_price=max_price)
-    print(50 * "-")
-    print(f"Le prix moyen des annonces est de {average_price}€")
+    analyze_listings(html_pages=content, max_price=max_price)
