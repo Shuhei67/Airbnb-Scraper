@@ -129,7 +129,8 @@ def analyze_listings(html_pages: list, max_price: int) -> None:
                 if int(price) <= max_price:
                     prices.append(int(price))
                     if link:
-                        links.append((int(price), f"https://www.airbnb.fr{link["href"]}"))
+                        href = link["href"].split("?")[0]  # On garde uniquement la partie avant le "?", ça rend plus "jolie" dans les résultats
+                        links.append((int(price), f"https://www.airbnb.fr{href}"))
                 else:
                     excluded += 1
 
