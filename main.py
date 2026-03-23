@@ -28,8 +28,8 @@ def fetch_content(url: str, from_disk: bool = False) -> list:
         print("🚀 Lancement du scraping, veuillez patienter...")
         logger.debug(f"Récupération du contenu de l'URL : {url}")
         html_pages = [] # Liste qui stockera html de chaque page
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
             page = browser.new_page()
             page.goto(url)
 
@@ -38,8 +38,12 @@ def fetch_content(url: str, from_disk: bool = False) -> list:
                 html_pages.append(page.content()) # On ajoute le contenu HTML à la liste
                 print(f"Page {i+1} récupérée.")
                 if i < 4:
+                    suivant = page.query_selector("a[aria-label='Suivant']") # Vérifie si le bouton Suivant existe
+                    if not suivant:
+                        print("Plus de pages disponibles, arrêt du scraping.")
+                        break
                     print(f"Récupuration de la page {i + 2} sur 5 en cours ...")
-                    page.wait_for_timeout(4000) # Attendre 4s avant de charger la page suivante
+                    page.wait_for_timeout(2500) # Attendre 2.5s avant de charger la page suivante
                     page.get_by_role("link", name="Suivant").click() # Cliquer sur le bouton "Suivant" pour charger la page suivante
             print(50 * "-")
             print("Analyse terminée !")
