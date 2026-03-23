@@ -5,16 +5,65 @@ import re
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from urllib.parse import quote # Transforme caractères spéciaux en URL safe
+from datetime import datetime
 
 FILEPATH = Path(__file__).parent / "airbnb.html"
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.ERROR)
 
+
+# Récupère les infos de l'utilisateur (ville, dates, nombre de personnes, budget) et valide les infos :
+def get_user_inputs() -> tuple:
+
+    print(50 * "-")
+    while True:
+        city = input("Ville : ").strip()
+        if city:
+            break
+        print("❌ Veuillez saisir une ville valide.")
+    while True:
+        checkin = input("Date d'arrivée (YYYY-MM-DD) : ").strip()
+        try:
+            checkin_date = datetime.strptime(checkin, "%Y-%m-%d")
+            break
+        except ValueError:
+            print("❌ Format de date invalide, veuillez utilisez YYYY-MM-DD .")
+    while True:
+        checkout = input("Date de départ (YYYY-MM-DD) : ").strip()
+        try:
+            checkout_date = datetime.strptime(checkout, "%Y-%m-%d")
+            if checkout_date <= checkin_date:
+                print("❌ La date de départ doit être après la date d'arrivée.")
+            else:
+                break
+        except ValueError:
+            print("❌ Format de date invalide, veuillez utilisez YYYY-MM-DD .")
+    while True:
+        try:
+            adults = int(input("Nombre de personnes : "))
+            if adults > 0:
+                break
+            print("❌ Le nombre de personnes doit être supérieur à 0.")
+        except ValueError:
+            print("❌ Veuillez entrer un nombre entier.")
+    while True:
+        try:
+            max_price = int(input("Budget total maximum : "))
+            if max_price > 0:
+                break
+            print("❌ Le budget doit être supérieur à 0.")
+        except ValueError:
+            print("❌ Veuillez entrer un nombre entier.")
+
+    return city, checkin, checkout, adults, max_price
+
+
 # Construit l'URL de recherche en fonction des paramètres d'entrée :
 def build_url(city: str, checkin: str, checkout: str, adults: int) -> str:
     city_formatted = quote(city.replace(" ", "--")) # "New York" → "New--York"
     return f"https://www.airbnb.fr/s/{city_formatted}/homes?refinement_paths%5B%5D=%2Fhomes&checkin={checkin}&checkout={checkout}&date_picker_type=calendar&adults={adults}&guests={adults}&search_type=AUTOSUGGEST"
+
 
 # Récupère 5 pages de résultats de recherche Airbnb et retourne une liste de leur contenu HTML :
 def fetch_content(url: str, from_disk: bool = False) -> list:
@@ -48,6 +97,7 @@ def fetch_content(url: str, from_disk: bool = False) -> list:
                         break
             print(50 * "-")
             print("Analyse terminée !")
+            print(50 * "-")
             browser.close()
 
         return html_pages  # on retourne la liste de 5 HTML
@@ -93,7 +143,9 @@ def analyze_listings(html_pages: list, max_price: int) -> None:
     average = round(sum(prices) / len(prices)) if prices else 0
     print(f"Le prix moyen des annonces est de {average} euros")
     print(50 * "-")
+    print(50 * "-")
     print("Voici dans l'ordre croissant les annonces dans votre budget :")
+    print(50 * "-")
     for price, url_link in sorted(links):  # ← trié du moins cher au plus cher
         print(f"- {price}€ ---> {url_link}")
 
@@ -118,12 +170,7 @@ def read_from_file() -> str:
 
 if __name__ == "__main__":
     print(50 * "-")
-    city = input("Ville : ")
-    checkin = input("Date d'arrivée (YYYY-MM-DD) : ")
-    checkout = input("Date de départ (YYYY-MM-DD) : ")
-    adults = int(input("Nombre de personnes : "))
-    max_price = int(input("Budget total maximum pour le mois : "))
-
+    city, checkin, checkout, adults, max_price = get_user_inputs()
     url = build_url(city=city, checkin=checkin, checkout=checkout, adults=adults)
     content = fetch_content(url=url, from_disk=False) # En mettant false il va sur internet
     analyze_listings(html_pages=content, max_price=max_price)
