@@ -4,7 +4,7 @@ import logging
 import re
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-
+from urllib.parse import quote # Transforme caractères spéciaux en URL safe
 
 FILEPATH = Path(__file__).parent / "airbnb.html"
 
@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.ERROR)
 
 # Construit l'URL de recherche en fonction des paramètres d'entrée :
 def build_url(city: str, checkin: str, checkout: str, adults: int) -> str:
-    city_formatted = city.replace(" ", "--") # "New York" → "New--York"
+    city_formatted = quote(city.replace(" ", "--")) # "New York" → "New--York"
     return f"https://www.airbnb.fr/s/{city_formatted}/homes?refinement_paths%5B%5D=%2Fhomes&checkin={checkin}&checkout={checkout}&date_picker_type=calendar&adults={adults}&guests={adults}&search_type=AUTOSUGGEST"
 
 # Récupère 5 pages de résultats de recherche Airbnb et retourne une liste de leur contenu HTML :
@@ -38,13 +38,14 @@ def fetch_content(url: str, from_disk: bool = False) -> list:
                 html_pages.append(page.content()) # On ajoute le contenu HTML à la liste
                 print(f"Page {i+1} récupérée.")
                 if i < 4:
-                    suivant = page.query_selector("a[aria-label='Suivant']") # Vérifie si le bouton Suivant existe
-                    if not suivant:
-                        print("Plus de pages disponibles, arrêt du scraping.")
+                    try:
+                        suivant = page.wait_for_selector("a[aria-label='Suivant']", timeout = 3000) # Vérifie si le bouton Suivant existe
+                        print(f"Récupuration de la page {i + 2} sur 5 en cours ...")
+                        page.wait_for_timeout(2500) # Attendre 2.5s avant de charger la page suivante
+                        suivant.click() # Cliquer sur le bouton "Suivant" pour charger la page suivante
+                    except:
+                        print("Pas de page suivante trouvée, arrêt du scraping.")
                         break
-                    print(f"Récupuration de la page {i + 2} sur 5 en cours ...")
-                    page.wait_for_timeout(2500) # Attendre 2.5s avant de charger la page suivante
-                    page.get_by_role("link", name="Suivant").click() # Cliquer sur le bouton "Suivant" pour charger la page suivante
             print(50 * "-")
             print("Analyse terminée !")
             browser.close()
@@ -93,8 +94,8 @@ def analyze_listings(html_pages: list, max_price: int) -> None:
     print(f"Le prix moyen des annonces est de {average} euros")
     print(50 * "-")
     print("Voici dans l'ordre croissant les annonces dans votre budget :")
-    for price, link in sorted(links):  # ← trié du moins cher au plus cher
-        print(f"- {price}€ ---> {link}")
+    for price, url_link in sorted(links):  # ← trié du moins cher au plus cher
+        print(f"- {price}€ ---> {url_link}")
 
 
 # Écrit le contenu dans un fichier :
